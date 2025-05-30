@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import imagePng from '../../assets/image.png'
 import imagePng1 from '../../assets/image1.png'
-import axios from 'axios';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, useNavigate } from 'react-router-dom';
+import { register } from '../../apiClient/index'
 const SignUp = () => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -70,42 +70,17 @@ const SignUp = () => {
       try {
       setIsLoading(true);
       
-      // Prepare the form data for the API
-      const formDataToSend = new FormData();
-      formDataToSend.append('first_name', formData.first_name);
-      formDataToSend.append('last_name', formData.last_name);
-      formDataToSend.append('username', formData.username);
-      formDataToSend.append('password', formData.password);
-      formDataToSend.append('confirm_password', formData.confirm_password);
-      if (formData.avatar) {
-        formDataToSend.append('avatar', formData.avatar);
-      }
-      const response = await axios.post(
-        'https://mock.arianalabs.io/api/staff/register/',
-        formDataToSend,
-        {
-          headers: {
-            'Content-Type': 'multipart/formdata',
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
-      );
-      localStorage.setItem('registeredUser', JSON.stringify({
-      username: formData.username,
-      password: formData.password,
-      first_name: formData.first_name,
-      last_name: formData.last_name,
-    }));
+      await register(formData);
     navigate('/');
 
-      console.log('Registration successful:', response.data);
-      // Handle successful registration (redirect, show message, etc.)
-      alert('Registration successful! You can now sign in.');
 
 
     } catch (err) {
-      console.error('Registration error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      if (err.response?.data?.username){
+        setError('Username Already Taken')
+      } else{
+        setError('Registration Failed,Please Try Again')
+      }
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +89,7 @@ const SignUp = () => {
     <div className=' h-screen w-screen p-3 flex justify-center items-center'>
             <div className='flex flex-col justify-center border-[1px] border-borderColor rounded-lg'>
               {error && (
-                  <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
                     {error}
                   </div>
                )}
@@ -155,7 +130,7 @@ const SignUp = () => {
                     </div>
                     </div>
                     <div className="mb-3 w-full ">
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="first_name">
+                        <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="first_name">
                         First Name
                         </label>
                         <div>
@@ -172,7 +147,7 @@ const SignUp = () => {
                         </div>
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="last_name">
+                        <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="last_name">
                         Last Name
                         </label>
                         <input
@@ -187,7 +162,7 @@ const SignUp = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
+                        <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="username">
                         Username
                         </label>
                         <input
@@ -200,9 +175,14 @@ const SignUp = () => {
                         onChange={handleInputChange}
                         placeholder="Please Enter Your Username"
                         />
+                        {error && (
+                  <div className="p-3 m-0 text-center text-red-600 rounded-md text-sm">
+                    {error.message || 'Username already taken'}
+                  </div>
+               )}
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+                        <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="password">
                         Password
                         </label>
                         <input
@@ -217,7 +197,7 @@ const SignUp = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirm_password">
+                        <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="confirm_password">
                         Confirm Password
                         </label>
                         <input
@@ -233,11 +213,8 @@ const SignUp = () => {
                     </div>
                     <div className="flex items-center justify-between w-full">
                         <button
-                        disabled={!isFormValid || isLoading}
-                        className={`font-bold py-2 px-4 rounded w-full text-white mt-2 ${
-                  !isFormValid || isLoading 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-blue-600 hover:bg-blue-700'
+                        // disabled={!isFormValid || isLoading}
+                        className={`font-bold py-2 px-4 rounded w-full text-white mt-2 bg-sameBlack ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                 }`}
                         type="submit"
                         >
@@ -245,7 +222,7 @@ const SignUp = () => {
                         </button>
                     </div>
                     <div className='mt-2 mb-10'>
-                        <p className='text-center'>Already Have An Account? <a href="/">Sign In</a></p>
+                        <p className='text-center'>Already Have An Account? <NavLink to="/">Sign In</NavLink></p>
                     </div>
             </form>
         </div>
