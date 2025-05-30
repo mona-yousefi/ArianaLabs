@@ -1,11 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-midnight: #121063;
-  --color-tahiti: #3ab7bf;
-  --color-bermuda: #78dcca;
+  --color-sameBlack: #020617;
+  --color-muted: #64748B;
   --color-borderColor:#E2E8F0;
-  --color-secondary:#F1F5F9
+  --color-secondary:#F1F5F9;
+  --color-primary:#0F172A;
+  --color-navColor:#F8FAFC;
+  --color-userColor:#585858;
+  --color-logoutButton:#DC2626;
+  --color-primaryForGround:#F8FAFC;
+  --color-primaryGray:#4E5553;
+  --font-inter: "Inter", "sans-serif";
+  --font-Geist: "Geist", "sans-serif";
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-display: swap;
+  src: url("assets/fonts/Inter-VariableFont_opsz\,wght.ttf");
+}
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-display: swap;
+  src: url("assets/fonts/Geist-VariableFont_wght.ttf");
 }
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
