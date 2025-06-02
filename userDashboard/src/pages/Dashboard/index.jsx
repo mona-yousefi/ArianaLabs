@@ -1,12 +1,16 @@
+
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import imgPng from '../../assets/image.png';
 import imgPng2 from '../../assets/image2.png';
 import icon from '../../assets/icon.png';
 import warningIcon from '../../assets/warning.png';
+import deleteIcon from '../../assets/deleteIcon.png';
+import close2 from '../../assets/close2.png';
 import close from '../../assets/close.png';
+import searchIcon from '../../assets/searchIcon.png';
 import { getCurrentUser } from '../../apiClient';
 
 const Dashboard = () => {
@@ -16,11 +20,180 @@ const Dashboard = () => {
     last_name: '',
     avatar:''
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tweets, setTweets] = useState([]);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [debounceTimeout, setDebounceTimeout] = useState(null);
+  const observer = useRef();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [showLogoutModal,setShowLogoutModal]=useState(false)
-  const navigate = useNavigate();
+  const [showDeleteModal,setShowDeleteModal]=useState(false)
+  const [scrollDebounce, setScrollDebounce] = useState(null);
+  const [newTweet, setNewTweet] = useState('');
 
+
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const date = new Date(timestamp);
+    const seconds = Math.floor((now - date) / 1000);
+    
+    let interval = Math.floor(seconds / 31536000);
+    if (interval >= 1) return `${interval} year${interval === 1 ? '' : 's'} ago`;
+    
+    interval = Math.floor(seconds / 2592000);
+    if (interval >= 1) return `${interval} month${interval === 1 ? '' : 's'} ago`;
+    
+    interval = Math.floor(seconds / 86400);
+    if (interval >= 1) return `${interval} day${interval === 1 ? '' : 's'} ago`;
+    
+    interval = Math.floor(seconds / 3600);
+    if (interval >= 1) return `${interval} hour${interval === 1 ? '' : 's'} ago`;
+    
+    interval = Math.floor(seconds / 60);
+    if (interval >= 1) return `${interval} minute${interval === 1 ? '' : 's'} ago`;
+    
+    return "just now";
+  };
+
+
+  const debouncedFetchMore = useCallback(() => {
+    if (scrollDebounce) clearTimeout(scrollDebounce);
+    
+    setScrollDebounce(
+      setTimeout(() => {
+        if (!isFetchingMore && hasMore) {
+          setIsFetchingMore(true);
+          setPage(prevPage => {
+            const nextPage = prevPage + 1;
+            justFetchTweets(searchQuery, nextPage, false);
+            return nextPage;
+          });
+        }
+      }, 500) // 500ms debounce for scroll
+    );
+  }, [isFetchingMore, hasMore, searchQuery])
+
+
+  const lastTweetRef = useCallback(node => {
+    if (isLoading || isFetchingMore) return;
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        debouncedFetchMore();
+      }
+    }, {
+      threshold: 0.5,
+      rootMargin: '200px'
+    });
+    
+    if (node) observer.current.observe(node);
+  }, [isLoading, isFetchingMore, hasMore, debouncedFetchMore]);
+
+  const justFetchTweets=async ()=>{
+    const token = localStorage.getItem('authToken');
+      const response = await axios.get(
+        'https://mock.arianalabs.io/api/tweet/',
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+        }
+      );
+        console.log(response.data)
+        setTweets(response.data.results);
+  }
+  
+  const handlePostTweet = async () => {
+  if (newTweet.trim() === '') {
+    return; // Don't post if the tweet is empty
+  }
+
+  setIsLoading(true); // Optionally, set a loading state while posting
+
+  const token = localStorage.getItem('authToken');
+  
+  try {
+    const response = await axios.post(
+      'https://mock.arianalabs.io/api/tweet/', // Adjust the API endpoint to match your backend
+      {
+        text: newTweet, // Send the tweet text
+      },
+      {
+        headers: {
+          Authorization: `Token ${token}`,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      }
+    );
+
+    // After the tweet is successfully posted, reset the textarea and update the tweets list
+    setNewTweet(''); // Clear the textarea
+    setTweets([response.data, ...tweets]); // Add the new tweet to the beginning of the tweets array
+  } catch (error) {
+    console.error('Error posting tweet:', error);
+  } finally {
+    setIsLoading(false); // Reset loading state
+  }
+};
+
+  const fetchTweets = async (search="",id, pageNum = 1, count_per_page, isNewSearch = true) => {
+    if (!search.trim()) {
+      setTweets([]);
+      return;
+    }
+
+    const loading = pageNum === 1 ? setIsLoading : setIsFetchingMore;
+    loading(true);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.get(
+        `https://mock.arianalabs.io/api/tweet/{${id}}`,
+        {
+          params: { 
+            search,
+            page: pageNum,
+            count_per_page: 10 // Adjust based on your API
+          },
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+
+      if (isNewSearch) {
+        setTweets(response.data.tweet);
+        setPage(1);
+      } else {
+        setTweets(prev => [...prev, ...response.data.tweet]);
+      }
+      
+      setHasMore(response.data.tweet >= 10); // Adjust based on your API
+    } catch (error) {
+      console.error('Error fetching tweets:', error);
+    } finally {
+      loading(false);
+    }
+  };
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    
+    if (debounceTimeout) clearTimeout(debounceTimeout);
+    
+    setDebounceTimeout(
+      setTimeout(() => {
+        justFetchTweets(query);
+      }, 800) // 800ms debounce
+    );
+  };
+  
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -54,6 +227,10 @@ const Dashboard = () => {
     fetchUserData();
   }, [navigate]);
 
+  useEffect(()=>{
+    justFetchTweets()
+  },[])
+
   const handleLogout = () => {
     setShowLogoutModal(true)
   };
@@ -66,16 +243,22 @@ const Dashboard = () => {
     setShowLogoutModal(false);
   };
 
+  const handleClickOption=()=>{
+    setShowDeleteModal(true)
+  }
+  const hideDeleteModal=()=>{
+    setShowDeleteModal(false)
+  }
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen w-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full text-center h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
       </div>
     );
   }
-
   return (
-    <div className={`flex w-screen ${showLogoutModal ? 'flex justify-center items-center -z-100' : ''}`}>
+    <div className="flex h-screen w-[100vw] bg-gray-100 overflow-hidden">
+      {/* Logout Modal (keep existing) */}
       {showLogoutModal && (
         <div className="bg-gray-700 fixed w-screen h-screen opacity-90 flex items-center justify-center z-100 ">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full opacity-100 flex flex-col items-center">
@@ -100,15 +283,11 @@ const Dashboard = () => {
           </div>
         </div>
       )}
-      <div className={`min-h-screen bg-gray-50 flex flex-col justify-between`}>
-      {/* Navigation Bar */}
-      <nav className="flex flex-col h-screen justify-between px-2 pt-10 pb-2 w-[240px]">
+
+      {/* Sidebar - Fixed position */}
+      <div className="fixed left-0 top-0 h-full w-60 bg-gray-50 flex flex-col">
         {/* User Data */}
-        <div className="max-w-7xl mx-auto sm:px-4 lg:px-6">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="flex items-center justify-center">
+        <div className="p-4 flex flex-col items-center mt-10">
           {avatarUrl ? (
             <img 
               src={avatarUrl}
@@ -116,45 +295,159 @@ const Dashboard = () => {
               className="h-12 w-12 rounded-full object-cover"
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-gray-300 flex items-center justify-center">
               <span className="text-xs font-Geist text-gray-600">
                 {userData.first_name?.[0]}{userData.last_name?.[0]}
               </span>
             </div>
           )}
+          <p className="text-[15px] font-Geist font-bold mt-2 text-gray-900 text-center">
+            {userData.first_name} {userData.last_name}
+          </p>
+          <p className="text-[15px] text-userColor text-center">@{userData.username}</p>
         </div>
-                <p className="text-[15px] font-Geist font-bold mt-2 text-gray-900 text-center">
-                  {userData.first_name} {userData.last_name}
-                </p>
-                <p className="text-[15px] text-userColor text-center">@{userData.username}</p>
+
+        {/* Logout Button */}
+        <div className="mt-auto p-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-1 w-full px-3 py-2 rounded-md text-white bg-red-500 hover:bg-red-600"
+          >
+            <img src={icon} className='w-[12px] h-[12px]' alt="" />
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="w-[100%] ml-60 overflow-y-auto">
+        {/* Header */}
+        <header className="bg-navColor p-4">
+          <img src={imgPng} className='w-[118px] h-[40px]' alt="Logo" />
+        </header>
+
+        {/* Search and Tweet Composition */}
+        <div className="p-4 max-w-3xl mx-auto">
+          <div className="relative">
+            <img src={searchIcon} alt="" className='absolute left-3 top-3 w-4 h-4'/>
+            <input 
+              type="search" 
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder='Search...' 
+              className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none'
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => {
+                  setSearchQuery('');
+                  setTweets([]);
+                  if (debounceTimeout) clearTimeout(debounceTimeout);
+                  justFetchTweets();
+                }}
+                className='absolute right-3 top-3'
+              >
+              </button>
+            )}
+          </div>
+
+          {/* Tweet Composition Box */}
+          <div className="mt-4 bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex gap-3">
+              <img 
+                src={avatarUrl || imgPng} 
+                alt="Profile" 
+                className='rounded-full w-10 h-10'
+              />
+              <div className="flex-1">
+                <textarea 
+                  placeholder="What's happening?"
+                  className="w-full p-2 border-b border-gray-200 focus:outline-none resize-none"
+                  rows={2}
+                  value={newTweet} // Bind to state
+        onChange={(e) => setNewTweet(e.target.value)}
+                />
+                <div className="flex justify-end mt-2">
+                  <button className="bg-primary text-white px-4 py-1 rounded-full hover:bg-primary-dark" onClick={handlePostTweet}>
+                    Post
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        {/* logout button */}
-        <main className="max-w-7xl mx-auto py-6 flex w-full bottom-0 justify-self-end">
-              <button
-                onClick={handleLogout}
-                className="flex items-center justify-center gap-1 px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-logoutButton hover:bg-red-700 focus:outline-none w-full"
+
+        {/* Tweets Feed */}
+        <div className="max-w-3xl mx-auto p-4">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          ) : tweets.length > 0 ? (
+            tweets.map((tweet, index) => (
+              <div 
+                key={tweet.id}
+                ref={index === tweets.length - 1 ? lastTweetRef : null}
+                className="bg-gray-200 bg-opacity-[8%] rounded-lg border border-gray-200 p-4 mb-4"
               >
-                <span>
-                  <img src={icon} className='w-[12px] h-[12px]' alt="" />
-                </span>
-                Logout
-              </button>
-        </main>
-      </nav>
-      </div>
-      <div className={`w-full flex flex-col ${showLogoutModal ? 'w-full' : 'w-[calc(100%-240px)]'} h-screen`}>
-          <nav className='bg-navColor'>
-            <img src={imgPng} className='w-[118px] h-[40px]' alt="" />
-          </nav>
-          <div className='flex justify-center items-center h-full'>
-            <img src={imgPng2} className='w-[480px] h-[480px]' alt="" />
-          </div>
+                <div className="flex justify-between items-start">
+                  <div className="flex gap-3">
+                    <img 
+                      src={tweet.author?.avatar || imgPng} 
+                      alt="Profile" 
+                      className='rounded-full w-10 h-10'
+                    />
+                    <div>
+                      <p className="font-bold">
+                        {tweet.author?.first_name} {tweet.author?.last_name}
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        {formatTimeAgo(tweet.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleClickOption(tweet.id)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ⋯
+                  </button>
+                </div>
+                <p className="mt-3">{tweet.text}</p>
+              </div>
+            ))
+          ) : searchQuery && !isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <img src={imgPng2} className='w-48 h-48' alt="No tweets found" />
+              <p className="mt-4 text-gray-500">No tweets found</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12">
+              <img src={imgPng2} className='w-48 h-48' alt="Welcome" />
+              <p className="mt-4 text-gray-500">Search for tweets or compose your own</p>
+            </div>
+          )}
+
+          {isFetchingMore && (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  );
+  )
 };
 
 export default Dashboard;
+
+
+
+
+
+
+
+
+
+
+
