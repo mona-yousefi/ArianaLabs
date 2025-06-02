@@ -69,4 +69,24 @@ export const getCurrentUser = async () => {
 export const logoutUser = async () => {
   localStorage.removeItem('authToken');
 };
+
+export const fetchTweets = async (search, ordering , page = 1, count_per_page= 10) => {
+  const token = localStorage.getItem('authToken');
+  return await apiClient.get('/tweets/', {
+    params: {
+      search,
+      ordering,
+      page,
+      page_size: count_per_page
+    },
+    headers: {
+            Authorization: `Bearer ${token}`,
+          },
+  });
+};
+
+export const fetchTrendingTopics = async () => {
+  return await apiClient.get('/api/tweets/trending/');
+};
 export default apiClient;
+
