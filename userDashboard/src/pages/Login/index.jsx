@@ -36,7 +36,7 @@ const Login = () => {
     setIsLoading(false);
   };
   return (
-    <div className=' h-screen w-screen p-3 flex justify-center items-center'>
+    <div className='w-[100vw] p-3 flex justify-center items-center'>
         <div className='flex flex-col w-[384px] justify-center border-[1px] border-borderColor rounded-lg'>
             <img src={imagePng} alt="" className='mb-5'/>
             <div className='px-8'>

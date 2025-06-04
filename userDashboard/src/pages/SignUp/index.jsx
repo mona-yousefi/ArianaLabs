@@ -60,12 +60,12 @@ const SignUp = () => {
     fileInputRef.current?.click();
   };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e,err) => {
     e.preventDefault();
     setError('');
 
 
-    if (!isFormValid) return;
+    if (!isFormValid) setError(err);
 
       try {
       setIsLoading(true);
@@ -76,20 +76,23 @@ const SignUp = () => {
 
 
     } catch (err) {
-      if (err.response?.data?.username){
-        setError('Username Already Taken')
-      } else{
-        setError('Registration Failed,Please Try Again')
+      console.log(err)
+      if(err.response.data.non_field_errors){
+        setError(err.response.data.non_field_errors[0])
+      }else if(err.response.data.avatar){
+        setError(err.response.data.avatar[0])
       }
+      
     } finally {
       setIsLoading(false);
     }
   };
   return (
-    <div className=' h-screen w-screen p-3 flex justify-center items-center'>
+    <div className='w-[100vw] flex justify-center items-center'>
+      <div className='flex justify-center items-center'>
             <div className='flex flex-col justify-center border-[1px] border-borderColor rounded-lg'>
               {error && (
-                  <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  <div className="p-3 bg-red-50 text-red-700 rounded-md text-[12px]">
                     {error}
                   </div>
                )}
@@ -100,7 +103,7 @@ const SignUp = () => {
                     </h2>
                     <p className='mt-2'>Enter your information to create an account..</p>
                 </div>
-                <form className="max-w-md px-10 mt-10 w-full" onSubmit={handleSubmit}>
+                <form className="max-w-md px-10 mt-10" onSubmit={handleSubmit}>
                 <div className='max-w-md border-[1px] w-full flex justify-between items-center px-2 '>
                   <div onClick={triggerFileInput} className='flex w-full justify-between items-center py-1'>
                     {imagePreview ? (
@@ -175,9 +178,9 @@ const SignUp = () => {
                         onChange={handleInputChange}
                         placeholder="Please Enter Your Username"
                         />
-                        {error && (
+                        {error =='Username already exists.' && (
                   <div className="p-3 m-0 text-center text-red-600 rounded-md text-sm">
-                    {error.message || 'Username already taken'}
+                    {error}
                   </div>
                )}
                     </div>
@@ -210,7 +213,8 @@ const SignUp = () => {
                         onChange={handleInputChange}
                         placeholder="Please Enter Your password again"
                         />
-                    </div>
+                    </div> 
+                  
                     <div className="flex items-center justify-between w-full">
                         <button
                         // disabled={!isFormValid || isLoading}
@@ -227,6 +231,7 @@ const SignUp = () => {
             </form>
         </div>
       </div>
+    </div>
   )
 }
 
