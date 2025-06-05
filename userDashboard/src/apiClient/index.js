@@ -34,7 +34,7 @@ export const login = async (username, password) => {
   } catch (error) {
     return {
       success: false,
-      error: error.response?.data?.detail || 'Invalid username or password'
+      error: error.message || 'Invalid username or password'
     };
   }
 };
@@ -70,23 +70,33 @@ export const logoutUser = async () => {
   localStorage.removeItem('authToken');
 };
 
-export const fetchTweets = async (search, ordering , page = 1, count_per_page= 10) => {
-  const token = localStorage.getItem('authToken');
-  return await apiClient.get('/tweets/', {
-    params: {
-      search,
-      ordering,
-      page,
-      page_size: count_per_page
-    },
-    headers: {
-            Authorization: `Bearer ${token}`,
-          },
-  });
-};
 
-export const fetchTrendingTopics = async () => {
-  return await apiClient.get('/api/tweets/trending/');
-};
+export const justFetchTweets=async (setTweets)=>{
+    const token = localStorage.getItem('authToken');
+      const response = await apiClient.get(
+        '/tweet/',
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+        }
+      );
+      setTweets(response.data.results);
+  }
+export const postTweets=async (newTweet)=>{
+    const token=localStorage.getItem('authToken');
+     await apiClient.post('/tweet/',
+    {
+      text:newTweet
+    },
+    {
+    headers:{
+      Authorization: `Token ${token}`,
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  }
+  )
+}
 export default apiClient;
 
