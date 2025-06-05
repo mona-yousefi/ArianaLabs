@@ -11,7 +11,7 @@ import deleteIcon from '../../assets/deleteIcon.png';
 import close2 from '../../assets/close2.png';
 import close from '../../assets/close.png';
 import searchIcon from '../../assets/searchIcon.png';
-import { getCurrentUser, justFetchTweets, postTweets } from '../../apiClient';
+import { deleteTweet, getCurrentUser, postTweet, searchTweets } from '../../apiClient';
 
 const Dashboard = () => {
   const [userData, setUserData] = useState({
@@ -76,7 +76,7 @@ const Dashboard = () => {
         }
       }, 500) // 500ms debounce for scroll
     );
-  }, [isFetchingMore, hasMore, searchQuery])
+  }, [scrollDebounce, isFetchingMore, hasMore, searchQuery])
 
 
   const lastTweetRef = useCallback(node => {
@@ -95,7 +95,20 @@ const Dashboard = () => {
     if (node) observer.current.observe(node);
   }, [isLoading, isFetchingMore, hasMore, debouncedFetchMore]);
 
-     justFetchTweets(setTweets)
+     const justFetchTweets=async(search='',page=1,isNewSearch=true)=>{
+      try {
+        const response=await searchTweets(search,page)
+        if (isNewSearch){
+          setTweets(response.data.results);
+          setPage(1)
+        } else{
+          setTweets(prev => [...prev,...response.data.results])
+        }
+        setHasMore(response.data.results.length>=10)
+      } catch (error) {
+        return error
+      }
+     }
   const handlePostTweet = async () => {
     if (newTweet.trim() === '') {
       return; // Don't post if the tweet is empty
@@ -103,59 +116,18 @@ const Dashboard = () => {
     
     setIsLoading(true); // Optionally, set a loading state while posting
     
-    const token = localStorage.getItem('authToken');
     
     try {
-          await postTweets(newTweet);
-              
-    setNewTweet(''); // Clear the textarea
-    setTweets([newTweet.text, ...tweets]); // Add the new tweet to the beginning of the tweets array
+          const response=await postTweet(newTweet); 
+          setNewTweet(''); // Clear the textarea
+          setTweets([newTweet.text, ...tweets]); // Add the new tweet to the beginning of the tweets array
   } catch (error) {
-    return error
+          return error
   } finally {
-    setIsLoading(false); // Reset loading state
+          setIsLoading(false); // Reset loading state
   }
 };
 
-const fetchTweets = async (search="",id, pageNum = 1, count_per_page, isNewSearch = true) => {
-  if (!search.trim()) {
-    setTweets([]);
-    return;
-  }
-  
-  const loading = pageNum === 1 ? setIsLoading : setIsFetchingMore;
-  loading(true);
-  
-  try {
-    const token = localStorage.getItem('authToken');
-    const response = await axios.get(
-      `https://mock.arianalabs.io/api/tweet/{${id}}`,
-      {
-        params: { 
-          search,
-          page: pageNum,
-          count_per_page: 10 // Adjust based on your API
-        },
-        headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
-      
-      if (isNewSearch) {
-        setTweets(response.data.tweet);
-        setPage(1);
-      } else {
-        setTweets(prev => [...prev, ...response.data.tweet]);
-      }
-      
-      setHasMore(response.data.tweet >= 10); // Adjust based on your API
-    } catch (error) {
-      return error
-    } finally {
-      loading(false);
-    }
-  };
   
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -238,18 +210,10 @@ const fetchTweets = async (search="",id, pageNum = 1, count_per_page, isNewSearc
     if (!tweetToDelete) return;
     
     try {
-      const token = localStorage.getItem('authToken');
-      await axios.delete(
-        `https://mock.arianalabs.io/api/tweet/${tweetToDelete}/`,
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-          },
-        }
-      );
-      
-      setTweets(prev => prev.filter(t => t.id !== tweetToDelete));
-      hideDeleteModal();
+      await deleteTweet(tweetToDelete);
+      setTweets(prev=>prev.filter(t=>t.id !== tweetToDelete))
+      hideDeleteModal()
+    
     } catch (error) {
       return error
     }
