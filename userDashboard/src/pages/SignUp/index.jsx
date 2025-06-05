@@ -76,7 +76,6 @@ const SignUp = () => {
 
 
     } catch (err) {
-      console.log(err)
       if(err.response.data.non_field_errors){
         setError(err.response.data.non_field_errors[0])
       }else if(err.response.data.avatar){
