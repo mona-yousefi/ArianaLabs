@@ -10,6 +10,14 @@ const apiClient = axios.create({
   }
 });
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Token ${token}`;
+  }
+  return config;
+});
+
 export const login = async (username, password) => {
   try {
     const formData = new FormData();
@@ -53,13 +61,6 @@ export const register = async (userData) => {
     return await apiClient.post('/staff/register/', formData,)
 };
 
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
-  }
-  return config;
-});
 
 
 export const getCurrentUser = async () => {
@@ -71,32 +72,27 @@ export const logoutUser = async () => {
 };
 
 
-export const justFetchTweets=async (setTweets)=>{
-    const token = localStorage.getItem('authToken');
-      const response = await apiClient.get(
-        '/tweet/',
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-        }
-      );
-      setTweets(response.data.results);
-  }
-export const postTweets=async (newTweet)=>{
-    const token=localStorage.getItem('authToken');
-     await apiClient.post('/tweet/',
-    {
-      text:newTweet
-    },
-    {
-    headers:{
-      Authorization: `Token ${token}`,
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  }
-  )
+export const getTweets=(params={})=>{
+  return apiClient.get('/tweet/',{params})
 }
+
+export const postTweet=(text)=>{
+  return apiClient.post('/tweet/',{text})
+}
+
+export const deleteTweet=(tweetId)=>{
+  return apiClient.delete(`/tweet/${tweetId}`)
+}
+export const searchTweets=(search,page=1, count_per_page=10)=>{
+  return apiClient.get(`/tweet/`,{
+    params:{
+      search,
+      page,
+      count_per_page
+    }
+  })
+}
+
+
 export default apiClient;
 
