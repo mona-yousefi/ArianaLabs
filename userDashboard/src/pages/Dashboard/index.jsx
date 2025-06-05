@@ -11,7 +11,7 @@ import deleteIcon from '../../assets/deleteIcon.png';
 import close2 from '../../assets/close2.png';
 import close from '../../assets/close.png';
 import searchIcon from '../../assets/searchIcon.png';
-import { getCurrentUser } from '../../apiClient';
+import { getCurrentUser, justFetchTweets, postTweets } from '../../apiClient';
 
 const Dashboard = () => {
   const [userData, setUserData] = useState({
@@ -34,6 +34,7 @@ const Dashboard = () => {
   const [showDeleteModal,setShowDeleteModal]=useState(false)
   const [scrollDebounce, setScrollDebounce] = useState(null);
   const [newTweet, setNewTweet] = useState('');
+  const [tweetToDelete, setTweetToDelete] = useState(null);
 
 
   const formatTimeAgo = (timestamp) => {
@@ -94,79 +95,53 @@ const Dashboard = () => {
     if (node) observer.current.observe(node);
   }, [isLoading, isFetchingMore, hasMore, debouncedFetchMore]);
 
-  const justFetchTweets=async ()=>{
-    const token = localStorage.getItem('authToken');
-      const response = await axios.get(
-        'https://mock.arianalabs.io/api/tweet/',
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-        }
-      );
-        console.log(response.data)
-        setTweets(response.data.results);
-  }
-  
+     justFetchTweets(setTweets)
   const handlePostTweet = async () => {
-  if (newTweet.trim() === '') {
-    return; // Don't post if the tweet is empty
-  }
-
-  setIsLoading(true); // Optionally, set a loading state while posting
-
-  const token = localStorage.getItem('authToken');
-  
-  try {
-    const response = await axios.post(
-      'https://mock.arianalabs.io/api/tweet/', // Adjust the API endpoint to match your backend
-      {
-        text: newTweet, // Send the tweet text
-      },
-      {
-        headers: {
-          Authorization: `Token ${token}`,
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      }
-    );
-
-    // After the tweet is successfully posted, reset the textarea and update the tweets list
+    if (newTweet.trim() === '') {
+      return; // Don't post if the tweet is empty
+    }
+    
+    setIsLoading(true); // Optionally, set a loading state while posting
+    
+    const token = localStorage.getItem('authToken');
+    
+    try {
+          await postTweets(newTweet);
+              
     setNewTweet(''); // Clear the textarea
-    setTweets([response.data, ...tweets]); // Add the new tweet to the beginning of the tweets array
+    setTweets([newTweet.text, ...tweets]); // Add the new tweet to the beginning of the tweets array
   } catch (error) {
-    console.error('Error posting tweet:', error);
+    return error
   } finally {
     setIsLoading(false); // Reset loading state
   }
 };
 
-  const fetchTweets = async (search="",id, pageNum = 1, count_per_page, isNewSearch = true) => {
-    if (!search.trim()) {
-      setTweets([]);
-      return;
-    }
-
-    const loading = pageNum === 1 ? setIsLoading : setIsFetchingMore;
-    loading(true);
-
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await axios.get(
-        `https://mock.arianalabs.io/api/tweet/{${id}}`,
-        {
-          params: { 
-            search,
-            page: pageNum,
-            count_per_page: 10 // Adjust based on your API
-          },
-          headers: {
+const fetchTweets = async (search="",id, pageNum = 1, count_per_page, isNewSearch = true) => {
+  if (!search.trim()) {
+    setTweets([]);
+    return;
+  }
+  
+  const loading = pageNum === 1 ? setIsLoading : setIsFetchingMore;
+  loading(true);
+  
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await axios.get(
+      `https://mock.arianalabs.io/api/tweet/{${id}}`,
+      {
+        params: { 
+          search,
+          page: pageNum,
+          count_per_page: 10 // Adjust based on your API
+        },
+        headers: {
             Authorization: `Token ${token}`,
           },
         }
       );
-
+      
       if (isNewSearch) {
         setTweets(response.data.tweet);
         setPage(1);
@@ -176,12 +151,12 @@ const Dashboard = () => {
       
       setHasMore(response.data.tweet >= 10); // Adjust based on your API
     } catch (error) {
-      console.error('Error fetching tweets:', error);
+      return error
     } finally {
       loading(false);
     }
   };
-
+  
   const handleSearch = (query) => {
     setSearchQuery(query);
     
@@ -202,7 +177,7 @@ const Dashboard = () => {
           navigate('/');
           return;
         }
-
+        
         // Fetch user data - adjust this endpoint based on your API
         const response = await getCurrentUser()
         setUserData(response.data);
@@ -215,22 +190,22 @@ const Dashboard = () => {
           const blob = new Blob([response.data.avatar_data], { type: 'image/jpeg' });
           setAvatarUrl(URL.createObjectURL(blob));
         }
-    }
-       catch (error) {
+      }
+      catch (error) {
         localStorage.removeItem('authToken');
         navigate('/');
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchUserData();
   }, [navigate]);
-
+  
   useEffect(()=>{
     justFetchTweets()
   },[])
-
+  
   const handleLogout = () => {
     setShowLogoutModal(true)
   };
@@ -242,11 +217,14 @@ const Dashboard = () => {
   const cancelLogout = () => {
     setShowLogoutModal(false);
   };
-
-  const handleClickOption=()=>{
+  
+  const handleClickOption=(tweetId)=>{
+    setTweetToDelete(tweetToDelete===tweetId ? null : tweetId);
     setShowDeleteModal(true)
+    
   }
   const hideDeleteModal=()=>{
+    setTweetToDelete(null)
     setShowDeleteModal(false)
   }
   if (isLoading) {
@@ -256,6 +234,26 @@ const Dashboard = () => {
       </div>
     );
   }
+  const handleDeleteTweet = async () => {
+    if (!tweetToDelete) return;
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      await axios.delete(
+        `https://mock.arianalabs.io/api/tweet/${tweetToDelete}/`,
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+      
+      setTweets(prev => prev.filter(t => t.id !== tweetToDelete));
+      hideDeleteModal();
+    } catch (error) {
+      return error
+    }
+  };
   return (
     <div className="flex h-screen w-[100vw] bg-gray-100 overflow-hidden">
       {/* Logout Modal (keep existing) */}
@@ -375,10 +373,11 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+          
         </div>
 
         {/* Tweets Feed */}
-        <div className="max-w-3xl mx-auto p-4">
+        <div className="max-w-3xl mx-auto p-4 relative">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
@@ -386,9 +385,9 @@ const Dashboard = () => {
           ) : tweets.length > 0 ? (
             tweets.map((tweet, index) => (
               <div 
-                key={tweet.id}
-                ref={index === tweets.length - 1 ? lastTweetRef : null}
-                className="bg-gray-200 bg-opacity-[8%] rounded-lg border border-gray-200 p-4 mb-4"
+              key={tweet.id}
+              ref={index === tweets.length - 1 ? lastTweetRef : null}
+              className="bg-gray-200 relative bg-opacity-[8%] rounded-lg border border-gray-200 p-4 mb-4"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex gap-3">
@@ -396,7 +395,7 @@ const Dashboard = () => {
                       src={tweet.author?.avatar || imgPng} 
                       alt="Profile" 
                       className='rounded-full w-10 h-10'
-                    />
+                      />
                     <div>
                       <p className="font-bold">
                         {tweet.author?.first_name} {tweet.author?.last_name}
@@ -406,12 +405,27 @@ const Dashboard = () => {
                       </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleClickOption(tweet.id)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ⋯
-                  </button>
+                {tweet.author.username === userData.username ? (
+                  <>
+                    <button 
+                      onClick={() => handleClickOption(tweet.id)}
+                      className="text-gray-500 hover:text-gray-700"
+                      >
+                      ⋯
+                    </button>
+                      {tweetToDelete===tweet.id && (
+                  <div className='absolute bottom-1 -right-[155px] z-50 bg-white w-[224px] rounded'>
+                    <button className='text-sm text-red-400 flex items-center gap-2 px-1 w-full' onClick={handleDeleteTweet}>
+                      <span>
+                      <img className='w-[14px] h=[14px]' src={deleteIcon} alt="" />
+                      </span>
+                      Delete Post?
+                    </button>
+                    </div>
+            )}
+                  </>
+                ) : ''}
+                  
                 </div>
                 <p className="mt-3">{tweet.text}</p>
               </div>
@@ -440,14 +454,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
-
-
-
-
-
-
-
-
-
-
