@@ -139,6 +139,11 @@ const Dashboard = () => {
         justFetchTweets(query);
       }, 800) // 800ms debounce
     );
+    if(query==''){
+      setSearchQuery('')
+      setTweets([])
+      justFetchTweets()
+    }
   };
   
   useEffect(() => {
@@ -212,7 +217,7 @@ const Dashboard = () => {
     try {
       await deleteTweet(tweetToDelete);
       setTweets(prev=>prev.filter(t=>t.id !== tweetToDelete))
-      hideDeleteModal()
+      // hideDeleteModal()
     
     } catch (error) {
       return error
